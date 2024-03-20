@@ -115,7 +115,10 @@ class S3Client:
               return True
         return False
 
+
+
     def download_file_and_upload_to_s3(self, bucket_name, url, file_name, keep_local=False):
+        import filetype
         from urllib.request import urlopen, Request
         import io
         # Download the file from the URL
@@ -123,6 +126,21 @@ class S3Client:
         request = Request(url=url, headers=headers)
         with urlopen(request) as response:
             content = response.read()
+
+        # Detect the MIME type of the content
+        kind = filetype.guess(content)
+        if kind is not None:
+            mime_type = kind.mime
+        else:
+            mime_type = None
+
+        # List of allowed MIME types
+        allowed_mime_types = ['image/bmp', 'image/jpeg', 'image/png', 'image/webp', 'video/mp4']
+
+        if mime_type not in allowed_mime_types:
+            print(f"File type not allowed: {mime_type}")
+            return None
+
         try:
             self.client.upload_fileobj(io.BytesIO(content), Bucket=bucket_name, Key=file_name)
         except Exception as e:
