@@ -4,12 +4,14 @@
 
 import argparse
 import boto3
+import os
 from os import getenv
 from dotenv import load_dotenv
 import logging
 from botocore.exceptions import ClientError
 from hashlib import md5
 from time import localtime
+from datetime import datetime
 
 # Load the environment variables
 load_dotenv()
@@ -20,20 +22,22 @@ class S3Client:
         self.client = self.init_client()
 
     def init_client(self):
-      # Initialize the S3 client
+        # Initialize the S3 client
         try:
             client = boto3.client(
                 "s3",
                 aws_access_key_id=getenv("aws_access_key_id"),
                 aws_secret_access_key=getenv("aws_secret_access_key"),
                 aws_session_token=getenv("aws_session_token"),
-                region_name=getenv("region_name"))
+                region_name=getenv("region"))
             client.list_buckets()
             return client
         except ClientError as e:
             logging.error(e)
-        except:
+            raise e
+        except Exception as e:
             logging.error("Unexpected Error")
+            raise e
 
     def list_buckets(self):
         # List all of the available buckets
@@ -115,7 +119,58 @@ class S3Client:
               return True
         return False
 
+    def upload_file(self, filename, bucket_name):
+        try:
+            self.client.upload_file(filename, bucket_name, filename)
+            print(f"File uploaded successfully to {bucket_name}")
+            return True
+        except ClientError as e:
+            print(f"An error occurred while uploading the file: {e}")
+            return False
 
+    def upload_file_object(self, filename, bucket_name):
+        try:
+            with open(filename, "rb") as file:
+                self.client.upload_fileobj(file, bucket_name, filename)
+                print(f"File object uploaded successfully to {bucket_name}")
+            return True
+        except ClientError as e:
+            logging.error(e)
+            return False
+
+    def upload_file_put(self, filename, bucket_name):
+        try:
+            with open(filename, "rb") as file:
+                self.client.put_object(Bucket=bucket_name, Key=filename, Body=file.read())
+                print(f"File uploaded successfully to {bucket_name}")
+            return True
+        except ClientError as e:
+            logging.error(e)
+            return False
+
+    def multipart_upload(self, filename, key, bucket_name):
+        mpu = self.client.create_multipart_upload(Bucket=bucket_name, Key=key)
+        mpu_id = mpu["UploadId"]
+        parts = []
+        uploaded_bytes = 0
+        total_bytes = os.stat(filename).st_size
+
+        with open(filename, "rb") as file:
+            i = 1
+            while True:
+                data = file.read(1024 * 1024)  # 1MB chunks
+                if not len(data):
+                    break
+                part = self.client.upload_part(Body=data, Bucket=bucket_name, Key=key, UploadId=mpu_id, PartNumber=i)
+                parts.append({"PartNumber": i, "ETag": part["ETag"]})
+                uploaded_bytes += len(data)
+                print("{0} of {1} uploaded".format(uploaded_bytes, total_bytes))
+                i += 1
+        result = self.client.complete_multipart_upload(
+            Bucket=bucket_name, Key=key, UploadId=mpu_id, MultipartUpload={"Parts": parts}
+        )
+        print(result)
+        return result
 
     def download_file_and_upload_to_s3(self, bucket_name, url, file_name, keep_local=False):
         import filetype
@@ -205,6 +260,146 @@ class S3Client:
             print(f"Error reading bucket policy: {e}")
             return False
 
+    def put_lifecycle_config(self, bucketname):
+        LifecycleConfiguration = {
+            'Rules': [
+                {
+                    'ID': 'DeleteAfter120Days',
+                    'Status': 'Enabled',
+                    'Prefix': '',
+                    'Expiration': {
+                        'Days': 120
+                    }
+                }
+            ]
+        }
+        try:
+            self.client.put_bucket_lifecycle_configuration(
+                Bucket=bucketname,
+                LifecycleConfiguration=LifecycleConfiguration
+            )
+            print(f"Lifecycle configuration successfully applied to bucket: {bucketname}")
+            return True
+        except ClientError as e:
+            print(f"Error applying lifecycle configuration to bucket: {bucketname}. Error code: {e.response['Error']['Code']}, Error message: {e.response['Error']['Message']}")
+            return False
+
+    def get_lifecycle_config(self, bucketname):
+        try:
+            response = self.client.get_bucket_lifecycle_configuration(Bucket=bucketname)
+            print(response)
+            return response
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchLifecycleConfiguration':
+                print(f"No lifecycle configuration found for bucket: {bucketname}")
+            else:
+                print(f"Error retrieving lifecycle configuration for bucket: {bucketname}. Error code: {e.response['Error']['Code']}, Error message: {e.response['Error']['Message']}")
+            return None
+
+    def manage_s3_object(self, bucket_name, file_name, flag):
+        if flag == ':delete':
+            try:
+                self.client.delete_object(Bucket=bucket_name, Key=file_name)
+                print(f"Successfully deleted {file_name} from {bucket_name}")
+                return True
+            except ClientError as e:
+                print(f"Error deleting {file_name} from {bucket_name}. Error: {e}")
+                return False
+
+        elif flag == ':versions':
+            try:
+                versions = self.client.list_object_versions(Bucket=bucket_name, Prefix=file_name)
+                for version in versions['Versions']:
+                    print(f"Version: {version['VersionId']}, Last Modified: {version['LastModified']}")
+                return True
+            except ClientError as e:
+                print(f"Error listing versions for {file_name} in {bucket_name}. Error: {e}")
+                return False
+        elif flag == ':lastversion':
+            try:
+                versions = self.client.list_object_versions(Bucket=bucket_name, Prefix=file_name)
+                if len(versions['Versions']) > 1:
+                    last_version = versions['Versions'][1]
+                    self.client.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': file_name, 'VersionId': last_version['VersionId']}, Key=file_name)
+                    print(f"Successfully uploaded the second last version of {file_name} as the newest in {bucket_name}")
+                    return True
+                else:
+                    print(f"No previous versions found for {file_name} in {bucket_name}")
+                    return False
+            except ClientError as e:
+                print(f"Error uploading the second last version of {file_name} as the newest in {bucket_name}. Error: {e}")
+                return False
+        else:
+            print("Invalid flag. Please use ':del' to delete, ':copy' to copy, ':down' to download, ':versions' to list versions, or ':lastversion' to upload the second last version as the newest.")
+            return False
+
+    def check_versioning(self, bucket_name):
+        try:
+            response = self.client.get_bucket_versioning(Bucket=bucket_name)
+            status = response['Status']
+            print(f'Versioning status for {bucket_name}: {status}')
+            return status
+        except ClientError as e:
+            print(f"Error checking versioning status for {bucket_name}. Error: {e}")
+            return None
+
+    def organize_by_extension(self, bucket_name):
+        try:
+            s3objects = self.client.list_objects(Bucket=bucket_name).get('Contents')
+
+            if not s3objects:
+                print("No objects found in the bucket or the bucket does not exist.")
+                return False
+
+            # Move each object to the corresponding folder
+            for obj in s3objects:
+                # Use the file extension (the part after the last dot) as the folder name
+                folder = obj['Key'].rsplit('.', 1)[-1]
+
+                new_key = f"{folder}/{obj['Key']}"
+
+                # Check if the object is already in the correct folder
+                if not obj['Key'].startswith(folder + '/'):
+                    self.client.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': obj['Key']}, Key=new_key)
+                    self.client.delete_object(Bucket=bucket_name, Key=obj['Key'])
+
+            print("Successfully organized files into folders based on their file extension")
+            return True
+
+        except ClientError as e:
+            print(f"An error occurred: {e}")
+            return False
+
+    def organize_by_type(self, bucket_name):
+        try:
+            s3objects = self.client.list_objects(Bucket=bucket_name)['Contents']
+
+            # Move each object to the corresponding folder
+            for obj in s3objects:
+                obj_metadata = self.client.head_object(Bucket=bucket_name, Key=obj['Key'])
+                content_type = obj_metadata['ContentType']
+
+                # Use the main type (the part before the slash) as the folder name
+                folder = content_type.split('/')[0]
+
+                new_key = f"{folder}/{obj['Key']}"
+
+                # Check if the object is already in the correct folder
+                if not obj['Key'].startswith(folder + '/'):
+                    self.client.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': obj['Key']}, Key=new_key)
+                    self.client.delete_object(Bucket=bucket_name, Key=obj['Key'])
+
+            print("Successfully organized files into folders based on their content type")
+            return True
+        except ClientError as e:
+            print(f"An error occurred: {e}")
+            return False
+
+    def print_object_metadata(self, bucket_name, object_key):
+        obj_metadata = self.client.head_object(Bucket=bucket_name, Key=object_key)
+        print(obj_metadata)
+
+
     # CLI functions with argparse
     def main(self):
         parser = argparse.ArgumentParser(description="S3 Client")
@@ -215,16 +410,48 @@ class S3Client:
         parser.add_argument("--create-multiple-buckets", nargs=3, help="Create multiple buckets (Arguments: name, first_index, last_index)")
         parser.add_argument("--delete-all-buckets", action="store_true", help="Delete all buckets")
         parser.add_argument("--bucket-exists", type=str, help="Check if the bucket exists (Arguments: bucket_name)")
-        parser.add_argument("--download-file-and-upload-to-s3", nargs=4, help="Download a file and upload it to S3 (bucket_name, url, file_name, keep_local = True or False)")
+        parser.add_argument("--download-file-and-upload-to-s3", nargs=4, help="Download a file and upload it to S3 (Arguments: bucket_name, url, file_name, keep_local = True or False)")
         parser.add_argument("--set-object-access-policy", nargs=2, help="Set object access policy (Arguments: bucket_name, file_name)")
         parser.add_argument("--generate-public-read-policy", type=str, help="Generate public read policy (Arguments: bucket_name)")
         parser.add_argument("--create-bucket-policy", type=str, help="Create bucket policy (Arguments: bucket_name)")
         parser.add_argument("--read-bucket-policy", type=str, help="Read bucket policy (Arguments: bucket_name)")
+        parser.add_argument("--upload-file", type=str, nargs=2, help="Upload a local file to S3 Bucket (Arguments: filename, bucketname)")
+        parser.add_argument("--upload-file-object", nargs=2, type=str, help="Upload a local file object to S3 Bucket (Arguments: filename, bucketname)")
+        parser.add_argument("--upload-file-put", nargs=2, type=str, help="Upload a local file using the PUT method to S3 Bucket (Arguments: filename, bucketname)")
+        parser.add_argument("--put-lifecycle-config", type=str, help="Apply lifecycle configuration to a bucket (Arguments: bucketname)")
+        parser.add_argument("--multipart-upload", nargs=3, help="Upload a file to S3 using multipart upload (Arguments: filename, key, bucketname)")
+        parser.add_argument("--get-lifecycle-config", type=str, help="Get the lifecycle configuration of a bucket (Arguments: bucketname)")
+        parser.add_argument("--manage-s3-object", nargs=3, help="Manage S3 object (Arguments: bucket_name, file_name, flag = -del, -copy or -down)", metavar=("bucket_name", "file_name", "flag"))
+        parser.add_argument("--check-versioning", type=str, help="Check versioning status of a bucket (Arguments: bucket_name)")
+        parser.add_argument("--organize-by-type", type=str, help="Organize files in the bucket based on their content type (Arguments: bucket_name)")
+        parser.add_argument('--organize-by-extension', type=str, help='The name of the S3 bucket to organize.')
+        parser.add_argument("--print-object-metadata", nargs=2, help="Print metadata of an object in a bucket (Arguments: bucket_name, object_key)")
+
 
         args = parser.parse_args()
 
         if args.list_buckets:
             print(self.list_buckets())
+        elif args.print_object_metadata:
+            self.print_object_metadata(args.print_object_metadata[0], args.print_object_metadata[1])
+        elif args.upload_file:
+            self.upload_file(args.upload_file[0], args.upload_file[1])
+        elif args.upload_file_object:
+            self.upload_file_object(args.upload_file_object[0], args.upload_file_object[1])
+        elif args.upload_file_put:
+            self.upload_file_put(args.upload_file_put[0], args.upload_file_put[1])
+        elif args.multipart_upload:
+            self.multipart_upload(args.multipart_upload[0], args.multipart_upload[1], args.multipart_upload[2])
+        elif args.put_lifecycle_config:
+            self.put_lifecycle_config(args.put_lifecycle_config)
+        elif args.get_lifecycle_config:
+            self.get_lifecycle_config(args.get_lifecycle_config)
+        elif args.check_versioning:
+            self.check_versioning(args.check_versioning)
+        elif args.organize_by_extension:
+            self.organize_by_extension(args.organize_by_extension)
+        elif args.organize_by_type:
+            self.organize_by_type(args.organize_by_type)
         elif args.list_bucket_names:
             self.list_bucket_names()
         elif args.delete_bucket:
@@ -247,9 +474,10 @@ class S3Client:
             self.create_bucket_policy(args.create_bucket_policy)
         elif args.read_bucket_policy:
             self.read_bucket_policy(args.read_bucket_policy)
+        elif args.manage_s3_object:
+            self.manage_s3_object(args.manage_s3_object[0], args.manage_s3_object[1], args.manage_s3_object[2])
 
 # Run the script
 if __name__ == "__main__":
-    s3 = S3Client()
-    s3.main()
-
+        s3 = S3Client()
+        s3.main()
