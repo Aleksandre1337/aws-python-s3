@@ -46,7 +46,7 @@ You can use the command-line interface to interact with the S3 client. Here are 
 - `--put-lifecycle-config <bucketname>`: Apply lifecycle configuration to a bucket.
 - `--multipart-upload <filename> <key> <bucketname>`: Upload a file to S3 using multipart upload.
 - `--get-lifecycle-config <bucketname>`: Get the lifecycle configuration of a bucket.
-- `--manage-s3-object <bucket_name> <file_name> <flag>`: Manage S3 object. The flag can be `:delete` (Deletes the specified file from the given S3 bucket), `:versions` (Lists all versions of the specified file in the given S3 bucket) or `:lastversion` (Uploads the second last version of the specified file as the newest version in the given S3 bucket) 
+- `--manage-s3-object <bucket_name> <file_name> <flag>`: Manage S3 object. The flag can be `:delete` (Deletes the specified file from the given S3 bucket), `:versions` (Lists all versions of the specified file in the given S3 bucket), `:lastversion` (Uploads the second last version of the specified file as the newest version in the given S3 bucket) or `:rename' (Prompts the user to enter new filename for the current file entered as initial argument).
 - `--check-versioning <bucket_name>`: Check versioning status of a bucket.
 - `--organize-by-type <bucket_name>`: Organize files in the bucket based on their content type.
 - `--organize-by-extension <bucket_name>`: Organize files in the bucket based on their file extension.
