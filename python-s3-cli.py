@@ -329,6 +329,16 @@ class S3Client:
             except ClientError as e:
                 print(f"Error uploading the second last version of {file_name} as the newest in {bucket_name}. Error: {e}")
                 return False
+        elif flag == ':rename':
+            try:
+                new_name = input("Enter a new name for the object: ")
+                self.client.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': file_name}, Key=new_name)
+                self.client.delete_object(Bucket=bucket_name, Key=file_name)
+                print(f"Successfully renamed {file_name} to {new_name} in {bucket_name}")
+                return True
+            except ClientError as e:
+                print(f"Error renaming {file_name} to {new_name} in {bucket_name}. Error: {e}")
+                return False
         else:
             print("Invalid flag. Please use ':del' to delete, ':copy' to copy, ':down' to download, ':versions' to list versions, or ':lastversion' to upload the second last version as the newest.")
             return False
