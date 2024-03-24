@@ -305,6 +305,14 @@ class S3Client:
             except ClientError as e:
                 print(f"Error deleting {file_name} from {bucket_name}. Error: {e}")
                 return False
+        elif flag == ':download':
+            try:
+                self.client.download_file(bucket_name, file_name, file_name)
+                print(f"Successfully downloaded {file_name} from {bucket_name}")
+                return True
+            except ClientError as e:
+                print(f"Error downloading {file_name} from {bucket_name}. Error: {e}")
+                return False
 
         elif flag == ':versions':
             try:
@@ -339,8 +347,20 @@ class S3Client:
             except ClientError as e:
                 print(f"Error renaming {file_name} to {new_name} in {bucket_name}. Error: {e}")
                 return False
+        elif flag == ':copy':
+            try:
+                new_name = input("Enter a new name for the copied object: ")
+                if new_name == file_name:
+                    print("Error: The new name must be different from the original name.")
+                    return False
+                self.client.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': file_name}, Key=new_name)
+                print(f"Successfully copied {file_name} to {new_name} in {bucket_name}")
+                return True
+            except ClientError as e:
+                print(f"Error copying {file_name} to {new_name} in {bucket_name}. Error: {e}")
+                return False
         else:
-            print("Invalid flag. Please use ':del' to delete, ':copy' to copy, ':down' to download, ':versions' to list versions, or ':lastversion' to upload the second last version as the newest.")
+            print("Invalid flag. Please use ':delete' to delete, ':copy' to copy, ':download' to download, ':versions' to list versions, or ':lastversion' to upload the second last version as the newest.")
             return False
 
     def check_versioning(self, bucket_name):
@@ -491,3 +511,4 @@ class S3Client:
 if __name__ == "__main__":
         s3 = S3Client()
         s3.main()
+
