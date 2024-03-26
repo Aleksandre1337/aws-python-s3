@@ -244,11 +244,17 @@ class S3Client:
         return json.dumps(policy)
 
     def create_bucket_policy(self, bucket_name):
-        self.client.put_bucket_policy(
-            Bucket=bucket_name,
-            Policy=self.generate_public_read_policy(bucket_name)
-        )
-        print(f"Bucket policy created for {bucket_name}")
+        try:
+            self.client.delete_public_access_block(Bucket=bucket_name)
+            self.client.put_bucket_policy(
+                Bucket=bucket_name,
+                Policy=self.generate_public_read_policy(bucket_name)
+            )
+            print(f"Bucket policy created for {bucket_name}")
+        except ClientError as e:
+            logging.error(e)
+            print(f"Error creating bucket policy: {e}")
+            return False
 
     def read_bucket_policy(self, bucket_name):
         try:
@@ -360,7 +366,7 @@ class S3Client:
                 print(f"Error copying {file_name} to {new_name} in {bucket_name}. Error: {e}")
                 return False
         else:
-            print("Invalid flag. Please use ':delete' to delete, ':copy' to copy, ':download' to download, ':versions' to list versions, or ':lastversion' to upload the second last version as the newest.")
+            print("Invalid flag. Please use ':del' to delete, ':copy' to copy, ':down' to download, ':versions' to list versions, or ':lastversion' to upload the second last version as the newest.")
             return False
 
     def check_versioning(self, bucket_name):
