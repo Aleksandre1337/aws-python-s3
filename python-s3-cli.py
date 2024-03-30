@@ -1,4 +1,4 @@
-# Description: This script is a simple S3 client that can be used to list, create, delete, and upload files to S3 buckets. It also has a CLI interface to interact with the S3 client.
+# Description: This script is a simple S3 client that can be used to list, create, delete, upload files to S3 buckets and etc. It also has a CLI interface to interact with the S3 client.
 # Before running the script, make sure to install the required packages. Also, make sure to set the correct environment variables for the AWS credentials.
 # Ensure that you have the required permissions to perform the operations on the S3 buckets. Use this script at your own risk.
 
