@@ -122,7 +122,7 @@ class S3Client:
               return True
         return False
 
-    def upload_file(self, filename, bucket_name):
+    def upload_file(self, bucket_name, filename):
         try:
             self.client.upload_file(filename, bucket_name, filename)
             print(f"File uploaded successfully to {bucket_name}")
@@ -131,7 +131,7 @@ class S3Client:
             print(f"An error occurred while uploading the file: {e}")
             return False
 
-    def upload_file_object(self, filename, bucket_name):
+    def upload_file_object(self, bucket_name, filename):
         try:
             with open(filename, "rb") as file:
                 self.client.upload_fileobj(file, bucket_name, filename)
@@ -141,7 +141,7 @@ class S3Client:
             logging.error(e)
             return False
 
-    def upload_file_put(self, filename, bucket_name):
+    def upload_file_put(self, bucket_name, filename):
         try:
             with open(filename, "rb") as file:
                 self.client.put_object(Bucket=bucket_name, Key=filename, Body=file.read())
@@ -151,7 +151,7 @@ class S3Client:
             logging.error(e)
             return False
 
-    def multipart_upload(self, filename, key, bucket_name):
+    def multipart_upload(self, bucket_name, key, filename):
         mpu = self.client.create_multipart_upload(Bucket=bucket_name, Key=key)
         mpu_id = mpu["UploadId"]
         parts = []
@@ -526,11 +526,11 @@ class S3Client:
         parser.add_argument("--generate-public-read-policy", type=str, help="Generate public read policy (Arguments: bucket_name)")
         parser.add_argument("--create-bucket-policy", type=str, help="Create bucket policy (Arguments: bucket_name)")
         parser.add_argument("--read-bucket-policy", type=str, help="Read bucket policy (Arguments: bucket_name)")
-        parser.add_argument("--upload-file", type=str, nargs=2, help="Upload a local file to S3 Bucket (Arguments: filename, bucketname)")
-        parser.add_argument("--upload-file-object", nargs=2, type=str, help="Upload a local file object to S3 Bucket (Arguments: filename, bucketname)")
-        parser.add_argument("--upload-file-put", nargs=2, type=str, help="Upload a local file using the PUT method to S3 Bucket (Arguments: filename, bucketname)")
+        parser.add_argument("--upload-file", type=str, nargs=2, help="Upload a local file to S3 Bucket (Arguments: bucketname, filename)")
+        parser.add_argument("--upload-file-object", nargs=2, type=str, help="Upload a local file object to S3 Bucket (Arguments: bucketname, filename)")
+        parser.add_argument("--upload-file-put", nargs=2, type=str, help="Upload a local file using the PUT method to S3 Bucket (Arguments: bucketname, filename)")
         parser.add_argument("--put-lifecycle-config", type=str, help="Apply lifecycle configuration to a bucket (Arguments: bucketname)")
-        parser.add_argument("--multipart-upload", nargs=3, help="Upload a file to S3 using multipart upload (Arguments: filename, key, bucketname)")
+        parser.add_argument("--multipart-upload", nargs=3, help="Upload a file to S3 using multipart upload (Arguments: bucketname, key, filename)")
         parser.add_argument("--get-lifecycle-config", type=str, help="Get the lifecycle configuration of a bucket (Arguments: bucketname)")
         parser.add_argument("--manage-s3-object", nargs=3, help="Manage S3 object (Arguments: bucket_name, file_name, flag = -del, -copy or -down)", metavar=("bucket_name", "file_name", "flag"))
         parser.add_argument("--check-versioning", type=str, help="Check versioning status of a bucket (Arguments: bucket_name)")
