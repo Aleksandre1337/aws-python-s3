@@ -57,6 +57,7 @@ You can use the command-line interface to interact with the S3 client. Here are 
 - `--organize-by-extension`: Organize files in the bucket based on their extension. Argument: `bucket_name`.
 - `--print-object-metadata`: Print metadata of an object in a bucket. Arguments: `bucket_name`, `object_key`.
 - `--upload-file-to-folder`: Upload a file to a folder in S3 Bucket. Arguments: `bucketname`, `filename`.
+- `--rollback-to-first`: Rolls back the object in the S3 Bucket to its first version. Arguments: `bucket_name`, `object_key`
 - `--clean-old-versions`: Clean old versions of a file in a bucket. Arguments: `bucket_name`, `filename`, `day`.
 - `--configure-website`: Configure website for a bucket. Arguments: `bucket_name`, `flag`. The `flag` argument can take the following values:
   - `get`: Get the website configuration for the specified bucket.
