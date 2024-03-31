@@ -28,29 +28,41 @@ You can set these variables in a `.env` file in the same directory as the script
 
 You can use the command-line interface to interact with the S3 client. Here are the available commands:
 
-- `--list-buckets`: List all available buckets with full body response.
+# AWS S3 CLI Commands
+
+- `--list-buckets`: List all available buckets (Full Body Response).
 - `--list-bucket-names`: List all available bucket names.
-- `--delete-bucket <name>`: Delete the specified bucket.
-- `--create-bucket <name>`: Create a new bucket.
-- `--create-multiple-buckets <name> <first_index> <last_index>`: Create multiple buckets.
+- `--delete-bucket`: Delete the specified bucket. Argument: `name`.
+- `--create-bucket`: Create a new bucket. Argument: `name`.
+- `--create-multiple-buckets`: Create multiple buckets. Arguments: `name`, `first_index`, `last_index`.
 - `--delete-all-buckets`: Delete all buckets.
-- `--bucket-exists <bucket_name>`: Check if the bucket exists.
-- `--download-file-and-upload-to-s3 <bucket_name> <url> <file_name> <keep_local>`: Download a file and upload it to S3. Set `keep_local` to True or False.
-- `--set-object-access-policy <bucket_name> <file_name>`: Set object access policy.
-- `--generate-public-read-policy <bucket_name>`: Generate public read policy.
-- `--create-bucket-policy <bucket_name>`: Create bucket policy.
-- `--read-bucket-policy <bucket_name>`: Read bucket policy.
-- `--upload-file <filename> <bucketname>`: Upload a local file to S3 Bucket.
-- `--upload-file-object <filename> <bucketname>`: Upload a local file object to S3 Bucket.
-- `--upload-file-put <filename> <bucketname>`: Upload a local file using the PUT method to S3 Bucket.
-- `--put-lifecycle-config <bucketname>`: Apply lifecycle configuration to a bucket.
-- `--multipart-upload <filename> <key> <bucketname>`: Upload a file to S3 using multipart upload.
-- `--get-lifecycle-config <bucketname>`: Get the lifecycle configuration of a bucket.
-- `--manage-s3-object <bucket_name> <file_name> <flag>`: Manage S3 object. Flags: `:delete` (delete file), `:download` (download file), `:versions` (list file versions), `:lastversion` (upload second last version as newest), `:rename` (rename file), `:copy` (copy file to new name).
-- `--check-versioning <bucket_name>`: Check versioning status of a bucket.
-- `--organize-by-type <bucket_name>`: Organize files in the bucket based on their content type.
-- `--organize-by-extension <bucket_name>`: Organize files in the bucket based on their file extension.
-- `--print-object-metadata <bucket_name> <object_key>`: Print metadata of an object in a bucket.
+- `--bucket-exists`: Check if the bucket exists. Argument: `bucket_name`.
+- `--download-file-and-upload-to-s3`: Download a file and upload it to S3. Arguments: `bucket_name`, `url`, `file_name`, `keep_local`.
+- `--set-object-access-policy`: Set object access policy. Arguments: `bucket_name`, `file_name`.
+- `--generate-public-read-policy`: Generate public read policy. Argument: `bucket_name`.
+- `--create-bucket-policy`: Create bucket policy. Argument: `bucket_name`.
+- `--read-bucket-policy`: Read bucket policy. Argument: `bucket_name`.
+- `--upload-file`: Upload a local file to S3 Bucket. Arguments: `filename`, `bucketname`.
+- `--upload-file-object`: Upload a local file object to S3 Bucket. Arguments: `filename`, `bucketname`.
+- `--upload-file-put`: Upload a local file using the PUT method to S3 Bucket. Arguments: `filename`, `bucketname`.
+- `--put-lifecycle-config`: Apply lifecycle configuration to a bucket. Argument: `bucketname`.
+- `--multipart-upload`: Upload a file to S3 using multipart upload. Arguments: `filename`, `key`, `bucketname`.
+- `--get-lifecycle-config`: Get the lifecycle configuration of a bucket. Argument: `bucketname`.
+- `--manage-s3-object`: Manage S3 object. Arguments: `bucket_name`, `file_name`, `flag`. The `flag` argument can take the following values:
+  - `-del`: Delete the specified S3 object.
+  - `-copy`: Copy the specified S3 object.
+  - `-down`: Download the specified S3 object.
+- `--check-versioning`: Check versioning status of a bucket. Argument: `bucket_name`.
+- `--organize-by-type`: Organize files in the bucket based on their content type. Argument: `bucket_name`.
+- `--organize-by-extension`: Organize files in the bucket based on their extension. Argument: `bucket_name`.
+- `--print-object-metadata`: Print metadata of an object in a bucket. Arguments: `bucket_name`, `object_key`.
+- `--upload-file-to-folder`: Upload a file to a folder in S3 Bucket. Arguments: `bucketname`, `filename`.
+- `--clean-old-versions`: Clean old versions of a file in a bucket. Arguments: `bucket_name`, `filename`, `day`.
+- `--configure-website`: Configure website for a bucket. Arguments: `bucket_name`, `flag`. The `flag` argument can take the following values:
+  - `get`: Get the website configuration for the specified bucket.
+  - `set`: Set the website configuration for the specified bucket.
+  - `upload`: Upload the website configuration to the specified bucket.
+  - `delete`: Delete the website configuration from the specified bucket.
 
 To use these commands, run the script with the desired command and its arguments. For example, to list all buckets, you would run:
 
