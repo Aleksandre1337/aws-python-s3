@@ -23,6 +23,7 @@ class S3Client:
     # Initialize the S3 client
     def __init__(self):
         self.client = self.init_client()
+        self.resource = self.init_resource()
 
     def init_client(self):
         # Initialize the S3 client
@@ -35,6 +36,23 @@ class S3Client:
                 region_name=getenv("region"))
             client.list_buckets()
             return client
+        except ClientError as e:
+            logging.error(e)
+            raise e
+        except Exception as e:
+            logging.error("Unexpected Error")
+            raise e
+
+    def init_resource(self):
+        # Initialize the S3 resource
+        try:
+            resource = boto3.resource(
+                "s3",
+                aws_access_key_id=getenv("aws_access_key_id"),
+                aws_secret_access_key=getenv("aws_secret_access_key"),
+                aws_session_token=getenv("aws_session_token"),
+                region_name=getenv("region"))
+            return resource
         except ClientError as e:
             logging.error(e)
             raise e
@@ -397,6 +415,44 @@ class S3Client:
             print(f"Error checking versioning status for {bucket_name}. Error: {e}")
             return None
 
+    def manage_versioning(self, bucket_name, flag):
+        if flag == 'enable':
+            try:
+                response = self.client.BucketVersioning(bucket_name).enable()
+                print(f"Versioning enabled for {bucket_name}")
+                return True
+            except ClientError as e:
+                print(f"Error: {e}")
+                return False
+        elif flag == 'suspend':
+            try:
+                response = self.client.BucketVersioning(bucket_name).suspend()
+                print(f"Versioning suspended for {bucket_name}")
+                return True
+            except ClientError as e:
+                print(f"Error: {e}")
+                return False
+
+    def rollback_to_first(self, bucket_name, object_key):
+      try:
+          response = self.client.list_object_versions(Bucket=bucket_name, Prefix=object_key)
+          if 'Versions' in response:
+              # Sort versions by LastModified timestamp in ascending order
+              versions = sorted(response['Versions'], key=lambda x: x['LastModified'])
+              # The first version in the sorted list is the very first version
+              first_version = versions[0]
+              # Copy the first version to overwrite the current version
+              self.client.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': object_key, 'VersionId': first_version['VersionId']}, Key=object_key)
+              print(f"Rolled back {object_key} to its first version.")
+              return True
+          else:
+              print("No versions found for the specified object.")
+              return False
+      except Exception as e:
+          print(f"Error: {e}")
+          return False
+  
+
     def organize_by_extension(self, bucket_name):
         try:
             s3objects = self.client.list_objects(Bucket=bucket_name).get('Contents')
@@ -539,8 +595,9 @@ class S3Client:
         parser.add_argument("--print-object-metadata", nargs=2, help="Print metadata of an object in a bucket (Arguments: bucket_name, object_key)")
         parser.add_argument("--upload-file-to-folder", nargs=2, help="Upload a file to a folder in S3 Bucket (Arguments: bucketname, filename")
         parser.add_argument("--clean-old-versions", nargs=3, help="Clean old versions of a file in a bucket (Arguments: bucket_name, filename, day (Default value is 180 days))")
+        parser.add_argument("--rollback-to-first", nargs=2, help="Rollback an object in a bucket to its first version (Arguments: bucket_name, object_key)")
         parser.add_argument("--configure-website", nargs=2, help="Configure website for a bucket (Arguments: bucket_name, flag (get, set, upload or delete))", metavar=("bucket_name", "flag"))
-
+        parser.add_argument("--manage-versioning", nargs=2, help="Manage versioning for a bucket (Arguments: bucket_name, flag (enable or suspend))", metavar=("bucket_name", "flag"))
 
         args = parser.parse_args()
 
@@ -594,11 +651,14 @@ class S3Client:
             self.upload_file_to_folder(args.upload_file_to_folder[0], args.upload_file_to_folder[1])
         elif args.clean_old_versions:
             self.clean_old_versions(args.clean_old_versions[0], args.clean_old_versions[1], int(args.clean_old_versions[2]))
+        elif args.rollback_to_first:
+            self.rollback_to_first(args.rollback_to_first[0], args.rollback_to_first[1])
         elif args.configure_website:
             self.configure_website(args.configure_website[0], args.configure_website[1])
+        elif args.manage_versioning:
+            self.manage_versioning(args.manage_versioning[0], args.manage_versioning[1])
 
 # Run the script
 if __name__ == "__main__":
         s3 = S3Client()
         s3.main()
-
