@@ -42,11 +42,11 @@ You can use the command-line interface to interact with the S3 client. Here are 
 - `--generate-public-read-policy`: Generate public read policy. Argument: `bucket_name`.
 - `--create-bucket-policy`: Create bucket policy. Argument: `bucket_name`.
 - `--read-bucket-policy`: Read bucket policy. Argument: `bucket_name`.
-- `--upload-file`: Upload a local file to S3 Bucket. Arguments: `filename`, `bucketname`.
-- `--upload-file-object`: Upload a local file object to S3 Bucket. Arguments: `filename`, `bucketname`.
-- `--upload-file-put`: Upload a local file using the PUT method to S3 Bucket. Arguments: `filename`, `bucketname`.
+- `--upload-file`: Upload a local file to S3 Bucket. Arguments: `bucketname`, `filename`.
+- `--upload-file-object`: Upload a local file object to S3 Bucket. Arguments: `bucketname`, `filename`.
+- `--upload-file-put`: Upload a local file using the PUT method to S3 Bucket. Arguments: `bucketname`, `filename`.
 - `--put-lifecycle-config`: Apply lifecycle configuration to a bucket. Argument: `bucketname`.
-- `--multipart-upload`: Upload a file to S3 using multipart upload. Arguments: `filename`, `key`, `bucketname`.
+- `--multipart-upload`: Upload a file to S3 using multipart upload. Arguments: `bucketname`, `key`, `filename`.
 - `--get-lifecycle-config`: Get the lifecycle configuration of a bucket. Argument: `bucketname`.
 - `--manage-s3-object`: Manage S3 object. Arguments: `bucket_name`, `file_name`, `flag`. The `flag` argument can take the following values:
   - `-del`: Delete the specified S3 object.
