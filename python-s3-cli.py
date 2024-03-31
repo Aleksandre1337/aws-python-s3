@@ -4,6 +4,8 @@
 
 import argparse
 import boto3
+import magic
+import mimetypes
 import os
 from os import getenv
 from dotenv import load_dotenv
@@ -11,7 +13,8 @@ import logging
 from botocore.exceptions import ClientError
 from hashlib import md5
 from time import localtime
-from datetime import datetime
+from datetime import datetime, timedelta
+import pytz
 
 # Load the environment variables
 load_dotenv()
@@ -208,6 +211,21 @@ class S3Client:
         s3_url = "https://s3-{0}.amazonaws.com/{1}/{2}".format('us-west-2', bucket_name, file_name)
         print(f"The file is available at {s3_url}")
         return s3_url
+
+
+    def upload_file_to_folder(self, bucket_name, filename):
+        try:
+            mime_type = magic.from_file(filename, mime=True)
+            extension = mimetypes.guess_extension(mime_type)
+            folder = extension[1:]
+            key = f"{folder}/{filename}"
+            self.client.upload_file(filename, bucket_name, key)
+
+            print(f"File uploaded successfully to {bucket_name}/{folder}")
+            return True
+        except ClientError as e:
+            print(f"An error occurred while uploading the file: {e}")
+            return False
 
     def set_object_access_policy(self, bucket_name, file_name):
         try:
@@ -431,9 +449,66 @@ class S3Client:
             print(f"An error occurred: {e}")
             return False
 
+    def clean_old_versions(self, bucket_name, file_name, day=180):
+        try:
+            age = datetime.now(pytz.utc) - timedelta(days=day)
+            all_objects = self.client.list_object_versions(Bucket=bucket_name, Prefix=file_name)
+            versions_to_delete = [{'Key': version['Key'], 'VersionId': version['VersionId']}
+                        for version in all_objects.get('Versions', [])
+                        if version['LastModified'] < age]
+            if versions_to_delete:
+                self.client.delete_objects(Bucket=bucket_name, Delete={'Objects': versions_to_delete})
+                print(f'Deleted versions of the {file_name} older than {day} days.')
+            return True
+        except ClientError as e:
+            print(f"An error occurred: {e}")
+            return False
+
+    def configure_website(self, bucket_name, flag):
+        website_configuration = {
+        'ErrorDocument': {'Key': 'error.html'},
+        'IndexDocument': {'Suffix': 'index.html'},
+        }
+        if flag == 'get':
+            try:
+                response = self.client.get_bucket_website(Bucket=bucket_name)
+                print(f'Website configuration for {bucket_name}: {response}')
+                return response
+            except ClientError as e:
+                print(f"Error getting the website configuration for {bucket_name}. Error: {e}")
+                return False
+        elif flag == 'upload':
+            try:
+                self.client.upload_file('index.html', bucket_name, 'index.html', ExtraArgs={'ContentType': 'text/html'})
+                print(f"Successfully uploaded index.html to {bucket_name}")
+                self.client.upload_file('error.html', bucket_name, 'error.html', ExtraArgs={'ContentType': 'text/html'})
+                print(f"Successfully uploaded error.html to {bucket_name}")
+                return True
+            except ClientError as e:
+                print(f"Error uploading the website configuration for {bucket_name}. Error: {e}")
+                return False
+        elif flag == 'set':
+            try:
+                self.client.put_bucket_website(Bucket=bucket_name, WebsiteConfiguration=website_configuration)
+                print(f"Successfully set the website configuration for {bucket_name}")
+                return True
+            except ClientError as e:
+                print(f"Error setting the website configuration for {bucket_name}. Error: {e}")
+                return False
+        elif flag == 'delete':
+            try:
+                self.client.delete_bucket_website(Bucket=bucket_name)
+                print(f"Successfully deleted the website configuration for {bucket_name}")
+                return True
+            except ClientError as e:
+                print(f"Error deleting the website configuration for {bucket_name}. Error: {e}")
+                return False
+
     def print_object_metadata(self, bucket_name, object_key):
         obj_metadata = self.client.head_object(Bucket=bucket_name, Key=object_key)
         print(obj_metadata)
+
+
 
 
     # CLI functions with argparse
@@ -462,6 +537,9 @@ class S3Client:
         parser.add_argument("--organize-by-type", type=str, help="Organize files in the bucket based on their content type (Arguments: bucket_name)")
         parser.add_argument('--organize-by-extension', type=str, help='The name of the S3 bucket to organize.')
         parser.add_argument("--print-object-metadata", nargs=2, help="Print metadata of an object in a bucket (Arguments: bucket_name, object_key)")
+        parser.add_argument("--upload-file-to-folder", nargs=2, help="Upload a file to a folder in S3 Bucket (Arguments: bucketname, filename")
+        parser.add_argument("--clean-old-versions", nargs=3, help="Clean old versions of a file in a bucket (Arguments: bucket_name, filename, day (Default value is 180 days))")
+        parser.add_argument("--configure-website", nargs=2, help="Configure website for a bucket (Arguments: bucket_name, flag (get, set, upload or delete))", metavar=("bucket_name", "flag"))
 
 
         args = parser.parse_args()
@@ -512,6 +590,12 @@ class S3Client:
             self.read_bucket_policy(args.read_bucket_policy)
         elif args.manage_s3_object:
             self.manage_s3_object(args.manage_s3_object[0], args.manage_s3_object[1], args.manage_s3_object[2])
+        elif args.upload_file_to_folder:
+            self.upload_file_to_folder(args.upload_file_to_folder[0], args.upload_file_to_folder[1])
+        elif args.clean_old_versions:
+            self.clean_old_versions(args.clean_old_versions[0], args.clean_old_versions[1], int(args.clean_old_versions[2]))
+        elif args.configure_website:
+            self.configure_website(args.configure_website[0], args.configure_website[1])
 
 # Run the script
 if __name__ == "__main__":
