@@ -4,6 +4,7 @@
 
 import argparse
 import boto3
+import s3fs
 import mimetypes
 import os
 from os import getenv
@@ -593,6 +594,55 @@ class S3Client:
         except Exception as e:
             logging.error(e)
 
+    def create_website(self, bucket_name, sourcedir):
+        try:
+            # Upload the website source files to the bucket (Preserve Subdirectories)
+            for root, dirs, files in os.walk(sourcedir):
+                for file in files:
+                    local_file_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(local_file_path, sourcedir)
+                    s3_file_path = relative_path.replace(os.sep, '/')  # Replace os.sep with '/' to handle Windows paths
+
+                    # Determine the file's content type
+                    content_type = mimetypes.guess_type(file)[0] or 'binary/octet-stream'
+
+                    print(f"Uploading {local_file_path} to {bucket_name}/{s3_file_path}")
+                    self.client.upload_file(local_file_path, bucket_name, s3_file_path, ExtraArgs={'ContentType': content_type})
+
+            # Website Configuration
+            website_configuration = {
+            'IndexDocument': {'Suffix': 'index.html'}
+            }
+            self.client.put_bucket_website(Bucket=bucket_name, WebsiteConfiguration=website_configuration)
+            print(f"Successfully set the website configuration for {bucket_name}")
+
+            # Set Permissions
+            policy = {
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Sid": "PublicReadGetObject",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": f"arn:aws:s3:::{bucket_name}/*"
+            }]
+            }
+            self.client.put_bucket_policy(Bucket=bucket_name, Policy=json.dumps(policy))
+
+            # Construct the website URL
+            location = self.client.get_bucket_location(Bucket=bucket_name)
+            region = location['LocationConstraint']
+
+            # If the region is None, the bucket is in us-east-1 (Normal System behavior)
+            if region is None:
+                region = 'us-east-1'
+            website_url = f'https://{bucket_name}.s3-website-{region}.amazonaws.com'
+
+            print(f'Your website is hosted at : {website_url}')
+        except ClientError as e:
+            logging.error(e)
+            return False
+
     # CLI functions with argparse
     def main(self):
         parser = argparse.ArgumentParser(description="S3 Client")
@@ -625,7 +675,7 @@ class S3Client:
         parser.add_argument("--configure-website", nargs=2, help="Configure website for a bucket (Arguments: bucket_name, flag (get, set, upload or delete))", metavar=("bucket_name", "flag"))
         parser.add_argument("--manage-versioning", nargs=2, help="Manage versioning for a bucket (Arguments: bucket_name, flag (enable or suspend))", metavar=("bucket_name", "flag"))
         parser.add_argument("--inspire", nargs='?', const='show', help="Generate and display or save a random quote from the specified author. Use 'show' or 'save'.")
-
+        parser.add_argument("--create-website", nargs=2, help="Create a website in an S3 bucket (Arguments: bucket_name, sourcedirectory)")
 
         args = parser.parse_args()
 
@@ -687,6 +737,8 @@ class S3Client:
             self.manage_versioning(args.manage_versioning[0], args.manage_versioning[1])
         elif args.inspire:
             self.generate_quote(args.inspire)
+        elif args.create_website:
+            self.create_website(args.create_website[0], args.create_website[1])
 
 # Run the script
 if __name__ == "__main__":
