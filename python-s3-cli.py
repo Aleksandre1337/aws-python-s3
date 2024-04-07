@@ -624,7 +624,7 @@ class S3Client:
         parser.add_argument("--rollback-to-first", nargs=2, help="Rollback an object in a bucket to its first version (Arguments: bucket_name, object_key)")
         parser.add_argument("--configure-website", nargs=2, help="Configure website for a bucket (Arguments: bucket_name, flag (get, set, upload or delete))", metavar=("bucket_name", "flag"))
         parser.add_argument("--manage-versioning", nargs=2, help="Manage versioning for a bucket (Arguments: bucket_name, flag (enable or suspend))", metavar=("bucket_name", "flag"))
-        parser.add_argument("--inspire", nargs='?', const='show', default='show', help="Generate and display or save a random quote from the specified author. Use 'show' or 'save'.")
+        parser.add_argument("--inspire", nargs='?', const='show', help="Generate and display or save a random quote from the specified author. Use 'show' or 'save'.")
 
 
         args = parser.parse_args()
