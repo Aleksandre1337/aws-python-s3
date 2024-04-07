@@ -8,6 +8,7 @@ Before running the script, make sure to install the required packages. You can i
 
 ```bash
 pip install -r requirements.txt
+poetry install
 ```
 
 
