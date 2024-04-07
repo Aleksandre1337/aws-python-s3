@@ -7,11 +7,9 @@ This S3 Client provides a variety of features for managing AWS S3 buckets and ob
 Before running the script, make sure to install the required packages. You can install them using pip or poetry:
 
 ```bash
-pip install boto3 python-dotenv
+pip install -r requirements.txt
 ```
-```bash
-poetry add boto3 python-dotenv
-```
+
 
 ## Configuration
 
