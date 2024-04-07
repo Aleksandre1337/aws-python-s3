@@ -628,6 +628,7 @@ class S3Client:
             }]
             }
             self.client.put_bucket_policy(Bucket=bucket_name, Policy=json.dumps(policy))
+            print(f'Successfully set the bucket policy for {bucket_name}')
 
             # Construct the website URL
             location = self.client.get_bucket_location(Bucket=bucket_name)
