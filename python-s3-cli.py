@@ -4,7 +4,6 @@
 
 import argparse
 import boto3
-import magic
 import mimetypes
 import os
 from os import getenv
@@ -15,6 +14,11 @@ from hashlib import md5
 from time import localtime
 from datetime import datetime, timedelta
 import pytz
+import requests
+import random
+import json
+
+
 
 # Load the environment variables
 load_dotenv()
@@ -232,6 +236,7 @@ class S3Client:
 
 
     def upload_file_to_folder(self, bucket_name, filename):
+        import magic
         try:
             mime_type = magic.from_file(filename, mime=True)
             extension = mimetypes.guess_extension(mime_type)
@@ -434,24 +439,15 @@ class S3Client:
                 return False
 
     def rollback_to_first(self, bucket_name, object_key):
-      try:
-          response = self.client.list_object_versions(Bucket=bucket_name, Prefix=object_key)
-          if 'Versions' in response:
-              # Sort versions by LastModified timestamp in ascending order
-              versions = sorted(response['Versions'], key=lambda x: x['LastModified'])
-              # The first version in the sorted list is the very first version
-              first_version = versions[0]
-              # Copy the first version to overwrite the current version
-              self.client.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': object_key, 'VersionId': first_version['VersionId']}, Key=object_key)
-              print(f"Rolled back {object_key} to its first version.")
-              return True
-          else:
-              print("No versions found for the specified object.")
-              return False
-      except Exception as e:
-          print(f"Error: {e}")
-          return False
-  
+        try:
+            response = self.client.list_object_versions(Bucket=bucket_name, Prefix=object_key)
+            first_version = response['Versions'][0]
+            self.resource.Object(bucket_name, object_key).copy_from(CopySource={'Bucket': bucket_name, 'Key': object_key, 'VersionId': first_version.id})
+            return True
+        except ClientError as e:
+            print(f"Error: {e}")
+            return False
+
 
     def organize_by_extension(self, bucket_name):
         try:
@@ -564,8 +560,38 @@ class S3Client:
         obj_metadata = self.client.head_object(Bucket=bucket_name, Key=object_key)
         print(obj_metadata)
 
+    def generate_quote(self, author, flag):
+        try:
+            if flag not in ['show', 'save']:
+                print("Invalid flag. Please use 'show' or 'save'.")
+                return False
 
+            headers = {
+                'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36',
+                'accept': 'application/json'
+            }
+            response = requests.get('https://type.fit/api/quotes', headers=headers)
+            quotes = response.json()
+            quotes = [quote for quote in quotes if author in quote['author']]
 
+            if not quotes:
+                print(f"No quotes found for the specified author: {author}")
+                return False
+
+            random_quote = random.choice(quotes)
+            output = random_quote['text']
+
+            if flag == 'show':
+                print(output)
+            elif flag == 'save':
+                bucket_name = input("Enter the bucket name to save the quote: ")
+                output_json = json.dumps(random_quote)
+                output_bytes = output_json.encode('utf-8')
+                print(f'Quote: {output}')
+                self.client.put_object(Bucket=bucket_name, Key=f"{author}.json", Body=output_bytes)
+                print(f"Quote saved to {bucket_name} as {author}.json")
+        except Exception as e:
+            logging.error(e)
 
     # CLI functions with argparse
     def main(self):
@@ -598,6 +624,9 @@ class S3Client:
         parser.add_argument("--rollback-to-first", nargs=2, help="Rollback an object in a bucket to its first version (Arguments: bucket_name, object_key)")
         parser.add_argument("--configure-website", nargs=2, help="Configure website for a bucket (Arguments: bucket_name, flag (get, set, upload or delete))", metavar=("bucket_name", "flag"))
         parser.add_argument("--manage-versioning", nargs=2, help="Manage versioning for a bucket (Arguments: bucket_name, flag (enable or suspend))", metavar=("bucket_name", "flag"))
+        parser.add_argument("--inspire", nargs=2, help="Generate and display or save a random quote from the specified author (Arguments: author, flag (show or save))")
+
+
 
         args = parser.parse_args()
 
@@ -657,8 +686,11 @@ class S3Client:
             self.configure_website(args.configure_website[0], args.configure_website[1])
         elif args.manage_versioning:
             self.manage_versioning(args.manage_versioning[0], args.manage_versioning[1])
+        elif args.inspire:
+            self.generate_quote(args.inspire[0], args.inspire[1])
 
 # Run the script
 if __name__ == "__main__":
         s3 = S3Client()
         s3.main()
+
