@@ -560,12 +560,12 @@ class S3Client:
         obj_metadata = self.client.head_object(Bucket=bucket_name, Key=object_key)
         print(obj_metadata)
 
-    def generate_quote(self, author, flag):
+    def generate_quote(self, flag='show'):
         try:
             if flag not in ['show', 'save']:
                 print("Invalid flag. Please use 'show' or 'save'.")
                 return False
-
+            author = input("Enter the author name: ")
             headers = {
                 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36',
                 'accept': 'application/json'
@@ -624,8 +624,7 @@ class S3Client:
         parser.add_argument("--rollback-to-first", nargs=2, help="Rollback an object in a bucket to its first version (Arguments: bucket_name, object_key)")
         parser.add_argument("--configure-website", nargs=2, help="Configure website for a bucket (Arguments: bucket_name, flag (get, set, upload or delete))", metavar=("bucket_name", "flag"))
         parser.add_argument("--manage-versioning", nargs=2, help="Manage versioning for a bucket (Arguments: bucket_name, flag (enable or suspend))", metavar=("bucket_name", "flag"))
-        parser.add_argument("--inspire", nargs=2, help="Generate and display or save a random quote from the specified author (Arguments: author, flag (show or save))")
-
+        parser.add_argument("--inspire", nargs='?', const='show', default='show', help="Generate and display or save a random quote from the specified author. Use 'show' or 'save'.")
 
 
         args = parser.parse_args()
@@ -687,7 +686,7 @@ class S3Client:
         elif args.manage_versioning:
             self.manage_versioning(args.manage_versioning[0], args.manage_versioning[1])
         elif args.inspire:
-            self.generate_quote(args.inspire[0], args.inspire[1])
+            self.generate_quote(args.inspire)
 
 # Run the script
 if __name__ == "__main__":
