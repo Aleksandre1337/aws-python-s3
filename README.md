@@ -8,6 +8,8 @@ Before running the script, make sure to install the required packages. You can i
 
 ```bash
 pip install -r requirements.txt
+```
+```bash
 poetry install
 ```
 
@@ -63,7 +65,7 @@ You can use the command-line interface to interact with the S3 client. Here are 
   - `set`: Set the website configuration for the specified bucket.
   - `upload`: Upload the website configuration to the specified bucket.
   - `delete`: Delete the website configuration from the specified bucket.
-- `--inspire`: Generate and display or save a random quote from the specified author Arguments: `author`, `flag (save or show)`.
+- `--inspire`: Generate and display or upload a random quote to S3 bucket from the specified author. Arguments: `author`, `flag (save or show)`.
 - `--create-website`: Create a website in an S3 bucket from a website source directory (Usually includes css, javascript, image files and folders) (Arguments: bucket_name, sourcedir)
 
 To use these commands, run the script with the desired command and its arguments. For example, to list all buckets, you would run:
