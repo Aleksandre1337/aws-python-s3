@@ -195,7 +195,7 @@ class S3Client:
         result = self.client.complete_multipart_upload(
             Bucket=bucket_name, Key=key, UploadId=mpu_id, MultipartUpload={"Parts": parts}
         )
-        print(result)
+        print(f"File uploaded successfully! Location: {result['Location']}, Bucket: {result['Bucket']}, Key: {result['Key']}, ETag: {result['ETag']}")
         return result
 
     def download_file_and_upload_to_s3(self, bucket_name, url, file_name, keep_local=False):
