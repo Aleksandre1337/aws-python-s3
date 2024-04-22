@@ -50,9 +50,14 @@ You can use the command-line interface to interact with the S3 client. Here are 
 - `--multipart-upload`: Upload a file to S3 using multipart upload. Arguments: `bucketname`, `key`, `filename`.
 - `--get-lifecycle-config`: Get the lifecycle configuration of a bucket. Argument: `bucketname`.
 - `--manage-s3-object`: Manage S3 object. Arguments: `bucket_name`, `file_name`, `flag`. The `flag` argument can take the following values:
-  - `-del`: Delete the specified S3 object.
-  - `-copy`: Copy the specified S3 object.
-  - `-down`: Download the specified S3 object.
+  
+  - `:delete`: Delete the specified S3 object.
+  - `:copy`: Copy the specified S3 object.
+  - `:download`: Download the specified S3 object.
+  - `:versions`: List versions of the specified S3 object.
+  - `:lastversion`: Upload the second last version of the specified S3 object as the newest.
+  - `:rename`: Rename the specified S3 object.
+  - `:setversion`: Set a specific version for the specified S3 object.
 - `--check-versioning`: Check versioning status of a bucket. Argument: `bucket_name`.
 - `--organize-by-type`: Organize files in the bucket based on their content type. Argument: `bucket_name`.
 - `--organize-by-extension`: Organize files in the bucket based on their extension. Argument: `bucket_name`.
@@ -67,6 +72,9 @@ You can use the command-line interface to interact with the S3 client. Here are 
   - `delete`: Delete the website configuration from the specified bucket.
 - `--inspire`: Generate and display or upload a random quote to S3 bucket from the specified author. Arguments: `author`, `flag (save or show)`.
 - `--create-website`: Create a website in an S3 bucket from a website source directory (Usually includes css, javascript, image files and folders) (Arguments: bucket_name, sourcedir)
+- `--get-file-stats`: Retrieve statistics about the files in a specified S3 bucket. This includes information about the file extensions and their usage amount used in the bucket. To use this argument, you need to provide the name of the bucket as an argument. For example: `--get-file-stats my_bucket_name`
+- `--get-all-stats`: Retrieve comprehensive statistics about a specified S3 bucket. This includes the total size of all files in the bucket. To use this argument, you need to provide the name of the bucket as an argument. For example: `--get-all-stats my_bucket_name`
+- `--encrypt-bucket`: Enable encryption for a specified S3 bucket. This will ensure that all data stored in the bucket is encrypted for added security. To use this argument, you need to provide the name of the bucket as an argument. For example: `--encrypt-bucket my_bucket_name`
 
 To use these commands, run the script with the desired command and its arguments. For example, to list all buckets, you would run:
 
