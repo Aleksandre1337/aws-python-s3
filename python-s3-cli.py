@@ -198,7 +198,7 @@ class S3Client:
         print(f"File uploaded successfully! Location: {result['Location']}, Bucket: {result['Bucket']}, Key: {result['Key']}, ETag: {result['ETag']}")
         return result
 
-    def download_file_and_upload_to_s3(self, bucket_name, url, file_name, keep_local=False):
+    def download_and_upload(self, bucket_name, url, file_name, keep_local=False):
         import filetype
         from urllib.request import urlopen, Request
         import io
@@ -216,7 +216,48 @@ class S3Client:
             mime_type = None
 
         # List of allowed MIME types
-        allowed_mime_types = ['image/bmp', 'image/jpeg', 'image/png', 'image/webp', 'video/mp4']
+        allowed_mime_types = [
+            'image/bmp',
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'image/svg-xml',
+            'image/svg+xml',
+            'video/mp4',
+            'text/plain',
+            'text/html',
+            'application/json',
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'audio/mpeg',
+            'audio/x-wav',
+            'video/x-msvideo',
+            'video/quicktime',
+            'application/zip',
+            'application/x-rar-compressed',
+            'application/javascript',
+            'text/css',
+            'application/xml',
+            'application/x-sh',
+            'application/x-perl',
+            'text/x-python',
+            'text/x-php',
+            'text/x-ruby',
+            'text/x-shellscript',
+            'text/x-java-source',
+            'application/octet-stream',
+            'application/vnd.android.package-archive',
+            'application/x-7z-compressed',
+            'application/x-tar',
+            'application/gzip',
+            'application/x-msdownload',
+        ]
+
 
         if mime_type not in allowed_mime_types:
             print(f"File type not allowed: {mime_type}")
@@ -231,7 +272,13 @@ class S3Client:
             with open(file_name, 'wb') as my_file:
                 my_file.write(content)
 
-        s3_url = "https://s3-{0}.amazonaws.com/{1}/{2}".format('us-west-2', bucket_name, file_name)
+        # Construct the website URL
+        location = self.client.get_bucket_location(Bucket=bucket_name)
+        region = location['LocationConstraint']
+        if region == None:
+            region = 'us-east-1'
+
+        s3_url = "https://{0}.s3.{1}.amazonaws.com/{2}".format(bucket_name, region, file_name)
         print(f"The file is available at {s3_url}")
         return s3_url
 
@@ -361,12 +408,17 @@ class S3Client:
             except ClientError as e:
                 print(f"Error downloading {file_name} from {bucket_name}. Error: {e}")
                 return False
-
         elif flag == ':versions':
             try:
                 versions = self.client.list_object_versions(Bucket=bucket_name, Prefix=file_name)
+                print(f'Current versions of {file_name}: \n')
                 for version in versions['Versions']:
-                    print(f"Version: {version['VersionId']}, Last Modified: {version['LastModified']}")
+                    print(f"Version ID: {version['VersionId']}")
+                    print(f"  - Size: {version['Size']} bytes")
+                    print(f"  - Is Latest: {version['IsLatest']}")
+                    print(f"  - Last Modified: {version['LastModified']} UTC")
+                    print(f"  - Owner: {version['Owner']['DisplayName']} ({version['Owner']['ID']})")
+                    print()
                 return True
             except ClientError as e:
                 print(f"Error listing versions for {file_name} in {bucket_name}. Error: {e}")
@@ -406,6 +458,19 @@ class S3Client:
                 return True
             except ClientError as e:
                 print(f"Error copying {file_name} to {new_name} in {bucket_name}. Error: {e}")
+                return False
+        elif flag == ':setversion':
+            try:
+                response = self.client.list_object_versions(Bucket=bucket_name, Prefix=file_name)
+                current_versions = response['Versions']
+                version_id = str(input('Enter your desired version ID (leave blank for latest):'))
+                if len(version_id) > 0:
+                    self.resource.Object(bucket_name, file_name).copy_from(CopySource={'Bucket': bucket_name, 'Key': file_name, 'VersionId': version_id})
+                    print(f'The Object {file_name} was successfully updated with version ID {version_id}')
+                else:
+                    print(f'No version ID was provided, the object {file_name} remains unchanged')
+            except ClientError as e:
+                print(f"Error setting version for {file_name} in {bucket_name}. Error: {e}")
                 return False
         else:
             print("Invalid flag. Please use ':del' to delete, ':copy' to copy, ':down' to download, ':versions' to list versions, or ':lastversion' to upload the second last version as the newest.")
@@ -644,6 +709,69 @@ class S3Client:
             logging.error(e)
             return False
 
+    def get_file_stats(self, bucket_name):
+        file_stats = {}
+        try:
+            response = self.client.list_objects_v2(Bucket=bucket_name)
+            if 'Contents' in response:
+                for item in response['Contents']:
+                    file_key = item['Key']
+                    file_extension = os.path.splitext(file_key)[1][1:]
+                    size_bytes = item['Size']
+
+                    if file_extension in file_stats:
+                        file_stats[file_extension]['Count'] += 1
+                        file_stats[file_extension]['Size'] += size_bytes
+                    else:
+                        file_stats[file_extension] = {'Count': 1, 'Size': size_bytes}
+        except ClientError as e:
+            logging.error(e)
+            return False
+        for stat in file_stats:
+            size_kb = file_stats[stat]['Size'] / 1024
+            size_mb = file_stats[stat]['Size'] / (1024 * 1024)
+            print(f"File extension: {stat}")
+            print(f"  - Number of files: {file_stats[stat]['Count']}")
+            print(f"  - Total size in bytes: {file_stats[stat]['Size']}")
+            print(f"  - Total size in KB: {size_kb}")
+            print(f"  - Total size in MB: {'{:.16f}'.format(size_mb)}")
+
+    def get_all_stats(self, bucket_name):
+        file_stats = {'Count': 0, 'Size': 0}
+        try:
+            response = self.client.list_objects_v2(Bucket=bucket_name)
+            if 'Contents' in response:
+                for item in response['Contents']:
+                    file_stats['Count'] += 1
+                    file_stats['Size'] += item['Size']
+            size_kb = file_stats['Size'] / 1024
+            size_mb = file_stats['Size'] / (1024 * 1024)
+            print(f'Number of files: {file_stats["Count"]}')
+            print(f'Total size in bytes: {file_stats["Size"]}')
+            print(f'Total size in KB: {size_kb}')
+            print(f"Total size in MB: {'{:.16f}'.format(size_mb)}")
+        except ClientError as e:
+            logging.error(e)
+            return False
+
+    def set_bucket_encryption(self, bucket_name):
+        try:
+            result = self.client.put_bucket_encryption(
+                Bucket=bucket_name,
+                ServerSideEncryptionConfiguration={
+                    "Rules": [
+                        {"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}
+                    ]
+                },
+            )
+            status_code = result["ResponseMetadata"]["HTTPStatusCode"]
+            if status_code == 200:
+                print(f'Encryption enabled for {bucket_name}')
+                return True
+        except ClientError as e:
+            logging.error(e)
+            return False
+
     # CLI functions with argparse
     def main(self):
         parser = argparse.ArgumentParser(description="S3 Client")
@@ -654,7 +782,7 @@ class S3Client:
         parser.add_argument("--create-multiple-buckets", nargs=3, help="Create multiple buckets (Arguments: name, first_index, last_index)")
         parser.add_argument("--delete-all-buckets", action="store_true", help="Delete all buckets")
         parser.add_argument("--bucket-exists", type=str, help="Check if the bucket exists (Arguments: bucket_name)")
-        parser.add_argument("--download-file-and-upload-to-s3", nargs=4, help="Download a file and upload it to S3 (Arguments: bucket_name, url, file_name, keep_local = True or False)")
+        parser.add_argument("--download-and-upload", nargs=4, help="Download a file and upload it to S3 (Arguments: bucket_name, url, file_name, keep_local = True or False)")
         parser.add_argument("--set-object-access-policy", nargs=2, help="Set object access policy (Arguments: bucket_name, file_name)")
         parser.add_argument("--generate-public-read-policy", type=str, help="Generate public read policy (Arguments: bucket_name)")
         parser.add_argument("--create-bucket-policy", type=str, help="Create bucket policy (Arguments: bucket_name)")
@@ -665,7 +793,7 @@ class S3Client:
         parser.add_argument("--put-lifecycle-config", type=str, help="Apply lifecycle configuration to a bucket (Arguments: bucketname)")
         parser.add_argument("--multipart-upload", nargs=3, help="Upload a file to S3 using multipart upload (Arguments: bucketname, key, filename)")
         parser.add_argument("--get-lifecycle-config", type=str, help="Get the lifecycle configuration of a bucket (Arguments: bucketname)")
-        parser.add_argument("--manage-s3-object", nargs=3, help="Manage S3 object (Arguments: bucket_name, file_name, flag = -del, -copy or -down)", metavar=("bucket_name", "file_name", "flag"))
+        parser.add_argument("--manage-s3-object", nargs=3, help="Manage S3 object (Arguments: bucket_name, file_name, flag = :delete, :versions, :download, :lastversion, :rename, :copy, :setversion)", metavar=("bucket_name", "file_name", "flag"))
         parser.add_argument("--check-versioning", type=str, help="Check versioning status of a bucket (Arguments: bucket_name)")
         parser.add_argument("--organize-by-type", type=str, help="Organize files in the bucket based on their content type (Arguments: bucket_name)")
         parser.add_argument('--organize-by-extension', type=str, help='The name of the S3 bucket to organize.')
@@ -677,6 +805,10 @@ class S3Client:
         parser.add_argument("--manage-versioning", nargs=2, help="Manage versioning for a bucket (Arguments: bucket_name, flag (enable or suspend))", metavar=("bucket_name", "flag"))
         parser.add_argument("--inspire", nargs='?', const='show', help="Generate and display or save a random quote from the specified author. Use 'show' or 'save'.")
         parser.add_argument("--create-website", nargs=2, help="Create a website in an S3 bucket (Arguments: bucket_name, sourcedirectory)")
+        parser.add_argument("--get-file-stats", type=str, help="Get file statistics (Extension) for a bucket (Arguments: bucket_name)")
+        parser.add_argument("--get-all-stats", type=str, help="Get all file statistics (Total Size) for a bucket (Arguments: bucket_name)")
+        parser.add_argument("--encrypt-bucket", type=str, help="Enable bucket encryption (Arguments: bucket_name)")
+
 
         args = parser.parse_args()
 
@@ -714,8 +846,8 @@ class S3Client:
             self.delete_all_buckets()
         elif args.bucket_exists:
             self.bucket_exists(args.bucket_exists)
-        elif args.download_file_and_upload_to_s3:
-            self.download_file_and_upload_to_s3(args.download_file_and_upload_to_s3[0], args.download_file_and_upload_to_s3[1], args.download_file_and_upload_to_s3[2], args.download_file_and_upload_to_s3[3])
+        elif args.download_and_upload:
+            self.download_and_upload(args.download_and_upload[0], args.download_and_upload[1], args.download_and_upload[2], args.download_and_upload[3])
         elif args.set_object_access_policy:
             self.set_object_access_policy(args.set_object_access_policy[0], args.set_object_access_policy[1])
         elif args.generate_public_read_policy:
@@ -740,9 +872,14 @@ class S3Client:
             self.generate_quote(args.inspire)
         elif args.create_website:
             self.create_website(args.create_website[0], args.create_website[1])
+        elif args.get_file_stats:
+            self.get_file_stats(args.get_file_stats)
+        elif args.get_all_stats:
+            self.get_all_stats(args.get_all_stats)
+        elif args.encrypt_bucket:
+            self.set_bucket_encryption(args.encrypt_bucket)
 
 # Run the script
 if __name__ == "__main__":
         s3 = S3Client()
         s3.main()
-
